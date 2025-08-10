@@ -1,0 +1,35 @@
+---
+- name: Provision Linux hosts with common config, admin user, optional Docker and Tailscale
+  hosts: all
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: roles/common
+    - role: roles/admin_user
+    - role: roles/docker
+    - role: roles/tailscale
+      when: install_tailscale | default(false)
+
+  post_tasks:
+    - name: Generate consolidated Tailscale inventory JSON on control node
+      vars:
+        inventory_map: |
+          {% set result = {} %}
+          {% for h in ansible_play_hosts_all %}
+          {% set hv = hostvars[h] %}
+          {% set obj = {
+              'tailscale_node_ipv4': hv.get('tailscale_node_ipv4', ''),
+              'tailscale_node_ipv6': hv.get('tailscale_node_ipv6', ''),
+              'tailscale_node_hostname_full': hv.get('tailscale_node_hostname_full', ''),
+              'tailscale_node_hostname_short': hv.get('tailscale_node_hostname_short', '')
+            } %}
+          {% set _ = result.update({h: obj}) %}
+          {% endfor %}
+          {{ result }}
+      ansible.builtin.copy:
+        dest: "{{ playbook_dir }}/tailscale_inventory.json"
+        content: "{{ inventory_map | to_nice_json }}\n"
+        mode: '0644'
+      delegate_to: localhost
+      run_once: true

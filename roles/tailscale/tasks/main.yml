@@ -1,0 +1,80 @@
+---
+# Install and configure Tailscale, with optional exit node and route advertising
+- name: Ensure curl is present for installer fetch
+  ansible.builtin.package:
+    name: curl
+    state: present
+
+- name: Download official Tailscale install script
+  ansible.builtin.get_url:
+    url: https://tailscale.com/install.sh
+    dest: /tmp/tailscale-install.sh
+    mode: '0755'
+
+- name: Run Tailscale install script (cross-distro)
+  ansible.builtin.command: /tmp/tailscale-install.sh
+  args:
+    creates: /usr/bin/tailscale
+
+- name: Enable and start Tailscale service
+  ansible.builtin.service:
+    name: tailscaled
+    enabled: true
+    state: started
+
+- name: Configure IPv4 forwarding for Tailscale
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    state: present
+    reload: yes
+  when: tailscale_advertise_routes | default(false) or tailscale_exit_node | default(false)
+
+- name: Configure IPv6 forwarding for Tailscale
+  ansible.posix.sysctl:
+    name: net.ipv6.conf.all.forwarding
+    value: '1'
+    state: present
+    reload: yes
+  when: tailscale_advertise_routes | default(false) or tailscale_exit_node | default(false)
+
+- name: Build tailscale up flags
+  ansible.builtin.set_fact:
+    tailscale_up_flags: >-
+      --authkey={{ tailscale_auth_key }}
+      {{ '--ssh' if (tailscale_ssh | default(false)) else '' }}
+      {{ '--advertise-exit-node' if (tailscale_exit_node | default(false)) else '' }}
+      {{ '--accept-routes' if (tailscale_accept_routes | default(false)) else '' }}
+      {{ '--advertise-routes=' + (tailscale_advertised_routes | join(',')) if (tailscale_advertise_routes | default(false)) and (tailscale_advertised_routes | length > 0) else '' }}
+      {{ '--reset' if (tailscale_reset | default(false)) else '' }}
+
+- name: Bring Tailscale up
+  ansible.builtin.command: "tailscale up {{ tailscale_up_flags | trim }}"
+  register: tailscale_up
+  changed_when: "'already' not in tailscale_up.stderr and 'Already' not in tailscale_up.stdout"
+  failed_when: false
+
+- name: Show tailscale up output
+  ansible.builtin.debug:
+    var: tailscale_up.stdout
+
+- name: Query Tailscale status (json)
+  ansible.builtin.command: tailscale status --json
+  register: tailscale_status
+  changed_when: false
+
+- name: Extract Tailscale node info from status
+  ansible.builtin.set_fact:
+    tailscale_node_ipv4: "{{ (tailscale_status.stdout | from_json).Self.TailscaleIPs | select('match', '^100\\.') | list | first | default('') }}"
+    tailscale_node_ipv6: "{{ (tailscale_status.stdout | from_json).Self.TailscaleIPs | select('match', '^fd7a:') | list | first | default('') }}"
+    tailscale_node_hostname_full: "{{ (tailscale_status.stdout | from_json).Self.DNSName | default('') }}"
+    tailscale_node_hostname_short: "{{ (tailscale_status.stdout | from_json).Self.HostName | default('') }}"
+
+- name: Debug extracted node info
+  ansible.builtin.debug:
+    msg:
+      ipv4: "{{ tailscale_node_ipv4 }}"
+      ipv6: "{{ tailscale_node_ipv6 }}"
+      full: "{{ tailscale_node_hostname_full }}"
+      short: "{{ tailscale_node_hostname_short }}"
+

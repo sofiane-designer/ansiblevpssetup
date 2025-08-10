@@ -1,0 +1,40 @@
+---
+# Admin user creation and SSH key setup
+- name: Ensure admin group exists (Debian uses sudo, RHEL uses wheel)
+  ansible.builtin.group:
+    name: "{{ 'sudo' if ansible_facts.os_family == 'Debian' else 'wheel' }}"
+    state: present
+
+- name: Create admin user
+  ansible.builtin.user:
+    name: "{{ admin_username }}"
+    groups: "{{ 'sudo' if ansible_facts.os_family == 'Debian' else 'wheel' }}"
+    append: true
+    shell: /bin/bash
+    create_home: true
+    state: present
+
+- name: Allow passwordless sudo for admin (safe, idempotent)
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/{{ admin_username }}"
+    content: "{{ admin_username }} ALL=(ALL) NOPASSWD:ALL\n"
+    mode: '0440'
+    owner: root
+    group: root
+    validate: 'visudo -cf %s'
+
+- name: Read local SSH public key
+  ansible.builtin.slurp:
+    src: "{{ local_ssh_public_key_path | expanduser }}"
+  delegate_to: localhost
+  run_once: true
+  register: slurped_pubkey
+
+- name: Authorize SSH key for admin user
+  ansible.builtin.authorized_key:
+    user: "{{ admin_username }}"
+    key: "{{ slurped_pubkey.content | b64decode }}"
+    state: present
+
+# Intentionally leave root enabled (no task needed)
+

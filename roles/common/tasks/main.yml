@@ -1,0 +1,57 @@
+---
+# Common role: facts, package manager detection, upgrades, essential packages
+- name: Ensure Python and package facts are available
+  ansible.builtin.setup:
+    gather_subset:
+      - '!all'
+      - 'min'
+
+- name: Set package manager facts
+  ansible.builtin.set_fact:
+    pkg_mgr: >-
+      {{ 'apt' if ansible_facts.os_family == 'Debian' else
+         'dnf' if ansible_facts.os_family in ['RedHat'] and (ansible_facts.distribution in ['Fedora', 'Rocky', 'AlmaLinux'] or ansible_facts.distribution_major_version|int >= 8) else
+         'yum' }}
+
+- name: Update package cache (apt)
+  ansible.builtin.apt:
+    update_cache: yes
+  when: pkg_mgr == 'apt'
+
+- name: Upgrade packages (apt)
+  ansible.builtin.apt:
+    upgrade: dist
+    autoremove: yes
+  when: pkg_mgr == 'apt'
+
+- name: Upgrade packages (dnf)
+  ansible.builtin.dnf:
+    name: '*'
+    state: latest
+    update_only: false
+  when: pkg_mgr == 'dnf'
+
+- name: Upgrade packages (yum)
+  ansible.builtin.yum:
+    name: '*'
+    state: latest
+  when: pkg_mgr == 'yum'
+
+- name: Install essential packages (apt)
+  ansible.builtin.apt:
+    name: "{{ essential_packages }}"
+    state: present
+  when: pkg_mgr == 'apt'
+
+- name: Install essential packages (dnf)
+  ansible.builtin.dnf:
+    name: "{{ essential_packages }}"
+    state: present
+  when: pkg_mgr == 'dnf'
+
+- name: Install essential packages (yum)
+  ansible.builtin.yum:
+    name: "{{ essential_packages }}"
+    state: present
+  when: pkg_mgr == 'yum'
+

@@ -1,0 +1,30 @@
+# Python / Ansible
+__pycache__/
+*.pyc
+.venv/
+
+# Ansible artifacts
+*.retry
+*.log
+*.cache/
+*.tar.gz
+*.tar
+*.zip
+
+# Vault files (keep encrypted only)
+# If you store unencrypted secrets locally, ignore them here
+vault.yml
+vault.yaml
+
+# Local inventory overrides
+inventory/*.vault
+inventory/*.local
+
+# Editor/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Generated outputs
+/tailscale_inventory.json
