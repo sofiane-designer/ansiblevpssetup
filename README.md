@@ -66,16 +66,52 @@ Important gating behavior (Docker/Compose)
 - If install_docker is false and Docker is absent, verify/tests are skipped.
 
 Quick start
-1) Install collections:
+1) Install required collections
+   
+   ```bash
    ansible-galaxy collection install -r collections/requirements.yml
-2) Confirm you can connect to hosts:
+   ```
+
+2) Verify connectivity to your hosts
+   
+   ```bash
    ansible all -m ping
-3) Provision base and admin user only (no Docker/Tailscale):
+   ```
+
+3) Provision base system and admin user (no Docker/Tailscale)
+   
+   ```bash
    ansible-playbook site.yml
-4) Provision with Docker:
+   ```
+
+4) Provision with Docker enabled
+   
+   ```bash
    ansible-playbook site.yml -e install_docker=true
-5) Provision with Docker and Tailscale (with vault password prompt):
+   ```
+
+5) Provision with Docker and Tailscale (prompts for vault password)
+   
+   ```bash
    ansible-playbook site.yml -e install_docker=true -e install_tailscale=true --ask-vault-pass
+   ```
+
+Tips
+- Use YAML inventory instead of INI:
+  
+  ```bash
+  ansible-playbook -i inventory/hosts.yml site.yml
+  ```
+- Limit to specific hosts:
+  
+  ```bash
+  ansible-playbook -l server1,server2 site.yml
+  ```
+- Override variables at runtime:
+  
+  ```bash
+  ansible-playbook site.yml -e install_docker=true -e docker_compose_test=false
+  ```
 
 Tailscale authentication via Ansible Vault
 - Create a vault file containing your key:
