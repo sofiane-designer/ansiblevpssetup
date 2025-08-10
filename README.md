@@ -1,5 +1,8 @@
 # Ansible VPS Setup
 
+[![CI](https://github.com/sofiane-designer/ansiblevpssetup/actions/workflows/lint.yml/badge.svg)](https://github.com/sofiane-designer/ansiblevpssetup/actions/workflows/lint.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Provision and harden Linux VPS hosts with a single playbook. This repo:
 - Installs system updates and essential packages
 - Creates an admin user with SSH key-based access and sudo
@@ -7,7 +10,24 @@ Provision and harden Linux VPS hosts with a single playbook. This repo:
 - Optionally installs and configures Tailscale (with exit-node and routes support)
 - Emits a consolidated Tailscale inventory JSON for easy consumption
 
-Contents
+Table of contents
+- Overview
+- Prerequisites
+- Inventory
+- Configuration highlights
+- Variables and flags
+- Gating behavior (Docker/Compose)
+- Quick start
+- Tailscale + Vault
+- Role details
+- Outputs
+- Security notes
+- Troubleshooting
+- Common commands
+- Development
+- License
+
+Overview
 - site.yml: main playbook
 - ansible.cfg: opinionated defaults (inventory path, sudo, output formatting)
 - group_vars/all.yml: global defaults and feature flags
@@ -23,17 +43,23 @@ Prerequisites (control node)
 - Ansible 2.14+ (or newer)
 - Python 3 on the control node
 - Install required collections:
+  
+  ```bash
   ansible-galaxy collection install -r collections/requirements.yml
+  ```
 
 Inventory
 - Default inventory used is inventory/hosts.ini (defined in ansible.cfg). To use the YAML inventory instead, pass -i inventory/hosts.yml.
 
 Example inventory/hosts.ini:
+
+```ini
 [all]
 server1 ansible_host=203.0.113.10 ansible_user=root
 server2 ansible_host=203.0.113.11 ansible_user=root
+```
 
-Configuration (ansible.cfg highlights)
+Configuration highlights (ansible.cfg)
 - inventory = inventory/hosts.ini: default inventory file
 - roles_path = roles: roles are resolved under ./roles
 - interpreter_python = auto_silent: auto-detect Python on managed hosts quietly
@@ -58,8 +84,8 @@ Defined in group_vars/all.yml (override per-host/group/inventory or via -e "key=
   - If true, install and configure Tailscale.
 - tailscale_* flags: control exit-node, routes, SSH, etc.
 
-Important gating behavior (Docker/Compose)
-- The docker role now detects whether Docker and Compose are already present.
+Gating behavior (Docker/Compose)
+- The docker role detects whether Docker and Compose are already present.
 - Verify/tests only run when their flags are true AND Docker/Compose are either:
   - being installed in this run (install_docker/install_docker_compose true), or
   - already present on the host.
@@ -115,11 +141,17 @@ Tips
 
 Tailscale authentication via Ansible Vault
 - Create a vault file containing your key:
+  
+  ```bash
   echo "vault_tailscale_auth_key: 'tskey-XXXXXXXXXXXXXXXX'" > group_vars/vault.yml
+  ```
 - Encrypt it:
+  
+  ```bash
   ansible-vault encrypt group_vars/vault.yml
-- group_vars/all.yml references tailscale_auth_key: "{{ vault_tailscale_auth_key | default('') }}"
-- Run with --ask-vault-pass or --vault-password-file to decrypt.
+  ```
+- group_vars/all.yml references tailscale_auth_key: `{{ vault_tailscale_auth_key | default('') }}`
+- Run with `--ask-vault-pass` or `--vault-password-file` to decrypt.
 
 Role details
 - common: updates package cache, upgrades system, installs packages from essential_packages (curl, python3, vim, git by default)
@@ -151,24 +183,45 @@ Troubleshooting
 
 Common commands
 - Use INI inventory (default):
+  
+  ```bash
   ansible-playbook site.yml
+  ```
 - Use YAML inventory:
+  
+  ```bash
   ansible-playbook -i inventory/hosts.yml site.yml
+  ```
 - Limit to specific hosts:
+  
+  ```bash
   ansible-playbook -l server1,server2 site.yml
+  ```
 - Override variables at runtime:
+  
+  ```bash
   ansible-playbook site.yml -e install_docker=true -e docker_compose_test=false
+  ```
 
 Development
 - Linting (if you use ansible-lint):
+  
+  ```bash
   ansible-lint
+  ```
 - Dry run / check mode:
+  
+  ```bash
   ansible-playbook site.yml --check
+  ```
 - Diff changes:
+  
+  ```bash
   ansible-playbook site.yml --diff
+  ```
 
 License
-- MIT (or your preferred license). Add a LICENSE file if you want to formalize it.
+- MIT — see LICENSE
 
 Contributions
 - Issues and PRs welcome. Please include details about OS/distro versions and your inventory/vars when reporting problems.
