@@ -2,29 +2,34 @@
 
 [![CI](https://github.com/sofiane-designer/ansiblevpssetup/actions/workflows/lint.yml/badge.svg)](https://github.com/sofiane-designer/ansiblevpssetup/actions/workflows/lint.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Ansible >= 2.14](https://img.shields.io/badge/Ansible-%E2%89%A5%202.14-blue)
 
-Provision and harden Linux VPS hosts with a single playbook. This repo:
-- Installs system updates and essential packages
-- Creates an admin user with SSH key-based access and sudo
-- Optionally installs Docker Engine and Docker Compose v2 with safe verification and smoke tests
-- Optionally installs and configures Tailscale (with exit-node and routes support)
-- Emits a consolidated Tailscale inventory JSON for easy consumption
+Ansible VPS Setup is an opinionated, production‑ready Ansible playbook that provisions and hardens fresh Linux VPS hosts in minutes. It establishes a secure, sane baseline, creates an administrative user with SSH key–based access, and — when enabled — installs Docker Engine and Docker Compose v2 with built‑in verification and smoke tests. You can also join hosts to your Tailscale mesh (including exit‑node and subnet routes) and export a machine‑readable view of your network.
+
+Highlights:
+- Upgrade system packages and install a curated set of essentials
+- Create an admin user with SSH key–only access and sudo privileges
+- Optional Docker Engine + Compose v2 with gated verification/tests
+- Optional Tailscale setup with exit‑node and routes support
+- Emit a consolidated Tailscale inventory JSON for downstream tooling
+- Idempotent, minimal assumptions, easy to override via group_vars/all.yml
 
 Table of contents
 - Overview
-- Folder structure
+- Use Cases
+- Folder Structure
 - Prerequisites
 - Inventory
-- Configuration highlights
-- Variables and flags
-- Gating behavior (Docker/Compose)
-- Quick start
+- Configuration Highlights
+- Variables and Feature Flags
+- Gating Behavior (Docker/Compose)
+- Quick Start
 - Tailscale + Vault
-- Role details
+- Role Details
 - Outputs
-- Security notes
+- Security Notes
 - Troubleshooting
-- Common commands
+- Common Commands
 - Development
 - License
 
@@ -40,7 +45,7 @@ Overview
   - tailscale: install + configure + facts
 - collections/requirements.yml: collection dependencies
 
-Folder structure
+Folder Structure
 
 ```text
 ansiblevpssetup/
@@ -77,7 +82,7 @@ ansiblevpssetup/
 # tailscale_inventory.json
 ```
 
-Prerequisites (control node)
+Prerequisites (Control Node)
 - Ansible 2.14+ (or newer)
 - Python 3 on the control node
 - Install required collections:
@@ -97,7 +102,7 @@ server1 ansible_host=203.0.113.10 ansible_user=root
 server2 ansible_host=203.0.113.11 ansible_user=root
 ```
 
-Configuration highlights (ansible.cfg)
+Configuration Highlights (ansible.cfg)
 - inventory = inventory/hosts.ini: default inventory file
 - roles_path = roles: roles are resolved under ./roles
 - interpreter_python = auto_silent: auto-detect Python on managed hosts quietly
@@ -106,7 +111,7 @@ Configuration highlights (ansible.cfg)
 - stdout_callback = yaml and bin_ansible_callbacks = True: readable, timed output
 - become defaults: sudo enabled by default, no prompt (requires passwordless sudo)
 
-Variables and feature flags
+Variables and Feature Flags
 Defined in group_vars/all.yml (override per-host/group/inventory or via -e "key=value"). Key flags:
 - install_docker: boolean
   - If true, install Docker and enable the service.
@@ -122,14 +127,14 @@ Defined in group_vars/all.yml (override per-host/group/inventory or via -e "key=
   - If true, install and configure Tailscale.
 - tailscale_* flags: control exit-node, routes, SSH, etc.
 
-Gating behavior (Docker/Compose)
+Gating Behavior (Docker/Compose)
 - The docker role detects whether Docker and Compose are already present.
 - Verify/tests only run when their flags are true AND Docker/Compose are either:
   - being installed in this run (install_docker/install_docker_compose true), or
   - already present on the host.
 - If install_docker is false and Docker is absent, verify/tests are skipped.
 
-Quick start
+Quick Start
 1) Install required collections
    
    ```bash
@@ -177,7 +182,7 @@ Tips
   ansible-playbook site.yml -e install_docker=true -e docker_compose_test=false
   ```
 
-Tailscale authentication via Ansible Vault
+Tailscale Authentication via Ansible Vault
 - Create a vault file containing your key:
   
   ```bash
@@ -191,7 +196,7 @@ Tailscale authentication via Ansible Vault
 - group_vars/all.yml references tailscale_auth_key: `{{ vault_tailscale_auth_key | default('') }}`
 - Run with `--ask-vault-pass` or `--vault-password-file` to decrypt.
 
-Role details
+Role Details
 - common: updates package cache, upgrades system, installs packages from essential_packages (curl, python3, vim, git by default)
 - admin_user: creates admin user (admin_username), installs your local public key (local_ssh_public_key_path), configures sudoers
 - docker:
@@ -204,7 +209,7 @@ Role details
 Outputs
 - tailscale_inventory.json is generated at the project root after a run, consolidating per-host Tailscale data (IPv4/IPv6/hostnames).
 
-Security notes
+Security Notes
 - host_key_checking is disabled in ansible.cfg for convenience. Consider enabling it in production and managing known_hosts.
 - become_ask_pass is false; configure passwordless sudo for the remote user or run with --ask-become-pass when required.
 - Store secrets (like Tailscale auth keys) only in encrypted vault files. Never commit plaintext credentials.
@@ -219,7 +224,7 @@ Troubleshooting
 - Compose binary architecture mismatch:
   - The role downloads a platform-specific binary; ensure ansible_architecture and ansible_system facts match your target.
 
-Common commands
+Common Commands
 - Use INI inventory (default):
   
   ```bash
