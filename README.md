@@ -12,6 +12,7 @@ Provision and harden Linux VPS hosts with a single playbook. This repo:
 
 Table of contents
 - Overview
+- Folder structure
 - Prerequisites
 - Inventory
 - Configuration highlights
@@ -38,6 +39,43 @@ Overview
   - docker: Docker Engine + Compose v2 + optional tests
   - tailscale: install + configure + facts
 - collections/requirements.yml: collection dependencies
+
+Folder structure
+
+```text
+ansiblevpssetup/
+├─ .github/
+│  └─ workflows/
+│     └─ lint.yml                 # CI: yamllint + ansible-lint
+├─ collections/
+│  └─ requirements.yml            # Ansible collections dependencies
+├─ group_vars/
+│  └─ all.yml                     # Global defaults and feature flags
+├─ inventory/
+│  ├─ hosts.ini                   # Default inventory (set in ansible.cfg)
+│  └─ hosts.yml                   # Alternative YAML inventory
+├─ roles/
+│  ├─ admin_user/
+│  │  └─ tasks/
+│  │     └─ main.yml              # Create admin user, SSH, sudoers
+│  ├─ common/
+│  │  └─ tasks/
+│  │     └─ main.yml              # Updates, base packages
+│  ├─ docker/
+│  │  └─ tasks/
+│  │     └─ main.yml              # Docker Engine + Compose + gating/tests
+│  └─ tailscale/
+│     └─ tasks/
+│        └─ main.yml              # Tailscale install/config + facts
+├─ .gitignore
+├─ LICENSE
+├─ README.md
+├─ ansible.cfg                    # Opinionated defaults
+└─ site.yml                       # Main playbook
+
+# Generated after runs (not committed):
+# tailscale_inventory.json
+```
 
 Prerequisites (control node)
 - Ansible 2.14+ (or newer)
