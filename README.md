@@ -9,8 +9,12 @@ Ansible VPS Setup is an opinionated, production‑ready Ansible playbook that pr
 Highlights:
 - Upgrade system packages and install a curated set of essentials
 - Create an admin user with SSH key–only access and sudo privileges
-- Optional Docker Engine + Compose v2 with gated verification/tests
+- Optional Docker Engine + Compose v2 with dynamic versioning and verification
 - Optional Tailscale setup with exit‑node and routes support
+- **NEW:** Comprehensive tagging system for selective execution
+- **NEW:** Handler-based service management and validation framework
+- **NEW:** Backup system with automated cleanup
+- **NEW:** Network retry logic and enhanced error handling
 - Emit a consolidated Tailscale inventory JSON for downstream tooling
 - Idempotent, minimal assumptions, easy to override via group_vars/all.yml
 
