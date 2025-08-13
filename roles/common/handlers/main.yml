@@ -1,0 +1,19 @@
+---
+# Common role handlers
+- name: update package cache
+  ansible.builtin.apt:
+    update_cache: yes
+  when: pkg_mgr == 'apt'
+  listen: "update package cache"
+
+- name: update package cache (dnf)
+  ansible.builtin.dnf:
+    update_cache: yes
+  when: pkg_mgr == 'dnf'
+  listen: "update package cache"
+
+- name: update package cache (yum)
+  ansible.builtin.yum:
+    update_cache: yes
+  when: pkg_mgr == 'yum'
+  listen: "update package cache"

@@ -7,10 +7,16 @@
   register: docker_cli_check
   changed_when: false
   failed_when: false
+  tags:
+    - docker
+    - detection
 
 - name: Set docker_installed fact
   ansible.builtin.set_fact:
     docker_installed: "{{ docker_cli_check.rc == 0 }}"
+  tags:
+    - docker
+    - detection
 
 # Detect if Docker Compose v2 is available (docker compose)
 - name: Detect Docker Compose v2
@@ -18,14 +24,23 @@
   register: compose_check
   changed_when: false
   failed_when: false
+  tags:
+    - docker
+    - detection
 
 - name: Set docker_compose_installed fact
   ansible.builtin.set_fact:
     docker_compose_installed: "{{ compose_check.rc == 0 }}"
+  tags:
+    - docker
+    - detection
 
 # Install Docker Engine via official script and ensure service running
 - name: Install and enable Docker (when requested)
   when: install_docker | default(false) | bool
+  tags:
+    - docker
+    - installation
   block:
     - name: Ensure curl is available to fetch Docker script
       ansible.builtin.package:
@@ -37,6 +52,13 @@
         url: https://get.docker.com
         dest: /tmp/get-docker.sh
         mode: '0755'
+        timeout: 30
+      retries: 3
+      delay: 5
+      register: docker_script_download
+      until: docker_script_download is succeeded
+      failed_when: docker_script_download is failed
+      ignore_errors: false
 
     - name: Run Docker install script
       ansible.builtin.command: /tmp/get-docker.sh
@@ -48,6 +70,7 @@
         name: docker
         enabled: true
         state: started
+      notify: "restart docker service"
 
     - name: Add admin user to docker group
       ansible.builtin.user:
@@ -58,10 +81,29 @@
 # Install Docker Compose v2 (CLI plugin) when requested
 - name: Install Docker Compose v2 (CLI plugin) on Linux
   when: install_docker_compose | default(true) | bool
+  tags:
+    - docker
+    - compose
+    - installation
   block:
-    - name: Detect latest compose plugin version (static)
+    - name: Get latest Docker Compose version from GitHub API
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/docker/compose/releases/latest
+        method: GET
+        return_content: yes
+        timeout: 10
+      register: compose_release_api
+      failed_when: false
+      retries: 2
+      delay: 3
+
+    - name: Set Docker Compose version (dynamic or fallback)
       ansible.builtin.set_fact:
-        docker_compose_v2_version: "v2.27.1"
+        docker_compose_v2_version: "{{ compose_release_api.json.tag_name | default('v2.27.1') if compose_release_api.status == 200 else 'v2.27.1' }}"
+
+    - name: Display Docker Compose version source
+      ansible.builtin.debug:
+        msg: "Using Docker Compose version {{ docker_compose_v2_version }} ({{ 'from GitHub API' if compose_release_api.status == 200 else 'fallback version' }})"
 
     - name: Create plugin directory
       ansible.builtin.file:
@@ -74,12 +116,20 @@
         url: "https://github.com/docker/compose/releases/download/{{ docker_compose_v2_version }}/docker-compose-{{ ansible_system | lower }}-{{ ansible_architecture }}"
         dest: /usr/lib/docker/cli-plugins/docker-compose
         mode: '0755'
+        timeout: 60
+      retries: 3
+      delay: 5
+      register: compose_download
+      until: compose_download is succeeded
 
 # Verify Docker installation only if requested and Docker is present or being installed
 - name: Verify Docker installation
   when:
     - docker_verify_installation | default(true) | bool
     - (install_docker | default(false) | bool) or (docker_installed | default(false) | bool)
+  tags:
+    - docker
+    - validation
   block:
     - name: Show docker version
       ansible.builtin.command: docker --version
@@ -99,6 +149,9 @@
   register: hello_world
   changed_when: false
   failed_when: false
+  tags:
+    - docker
+    - validation
 
 - name: Show hello-world output
   when:
@@ -106,12 +159,19 @@
     - hello_world is defined
   ansible.builtin.debug:
     var: hello_world.stdout
+  tags:
+    - docker
+    - validation
 
 # Minimal docker compose test only if requested and Compose is present or being installed
 - name: Minimal docker compose test using Alpine
   when:
     - docker_compose_test | default(true) | bool
     - (install_docker_compose | default(true) | bool) or (docker_compose_installed | default(false) | bool)
+  tags:
+    - docker
+    - compose
+    - validation
   block:
     - name: Create test compose file
       ansible.builtin.copy:
@@ -131,3 +191,26 @@
     - name: Show compose output
       ansible.builtin.debug:
         var: compose_run.stdout
+
+- name: Validate Docker service is running and enabled
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: yes
+  check_mode: yes
+  register: docker_service_validation
+  when: (install_docker | default(false) | bool) or (docker_installed | default(false) | bool)
+  tags:
+    - docker
+    - validation
+
+- name: Validate Docker Compose plugin is accessible
+  ansible.builtin.command: docker compose version
+  register: compose_validation
+  changed_when: false
+  failed_when: false
+  when: (install_docker_compose | default(true) | bool) or (docker_compose_installed | default(false) | bool)
+  tags:
+    - docker
+    - compose
+    - validation

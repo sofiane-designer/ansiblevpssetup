@@ -1,0 +1,13 @@
+---
+# Docker role handlers
+- name: restart docker
+  ansible.builtin.service:
+    name: docker
+    state: restarted
+  listen: "restart docker service"
+
+- name: reload docker
+  ansible.builtin.service:
+    name: docker
+    state: reloaded
+  listen: "reload docker service"

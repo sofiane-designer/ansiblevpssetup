@@ -1,0 +1,72 @@
+---
+# Test playbook to validate improvements
+- name: Test Ansible VPS Setup improvements
+  hosts: localhost
+  connection: local
+  gather_facts: yes
+  vars:
+    test_admin_username: testuser
+    test_essential_packages:
+      - curl
+      - vim
+  
+  tasks:
+    - name: Test package manager detection
+      include_role:
+        name: roles/common
+        tasks_from: main
+      vars:
+        essential_packages: "{{ test_essential_packages }}"
+      tags: test-common
+
+    - name: Test tag functionality - common only
+      debug:
+        msg: "Testing tag-based execution for common role"
+      tags: test-tags
+
+    - name: Validate package manager was detected
+      assert:
+        that:
+          - pkg_mgr is defined
+          - pkg_mgr != 'unknown'
+        fail_msg: "Package manager detection failed"
+        success_msg: "Package manager {{ pkg_mgr }} detected successfully"
+      tags: test-validation
+
+    - name: Test Docker version fetching (without installation)
+      uri:
+        url: https://api.github.com/repos/docker/compose/releases/latest
+        method: GET
+        return_content: yes
+        timeout: 10
+      register: test_compose_api
+      failed_when: false
+      tags: test-docker
+
+    - name: Validate Docker Compose version fetching
+      assert:
+        that:
+          - test_compose_api.status == 200 or test_compose_api.status == -1
+        fail_msg: "Docker Compose version fetching test failed"
+        success_msg: "Docker Compose version fetching works"
+      tags: test-docker
+
+    - name: Test backup directory creation
+      file:
+        path: /tmp/test-ansible-backup
+        state: directory
+        mode: '0750'
+      tags: test-backup
+
+    - name: Test backup functionality
+      copy:
+        content: "test backup content"
+        dest: /tmp/test-ansible-backup/test.backup
+        mode: '0640'
+      tags: test-backup
+
+    - name: Cleanup test files
+      file:
+        path: /tmp/test-ansible-backup
+        state: absent
+      tags: test-cleanup

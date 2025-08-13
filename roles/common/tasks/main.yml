@@ -6,23 +6,85 @@
       - '!all'
       - 'min'
 
-- name: Set package manager facts
+- name: Set package manager facts with robust detection
   ansible.builtin.set_fact:
     pkg_mgr: >-
       {{ 'apt' if ansible_facts.os_family == 'Debian' else
-         'dnf' if ansible_facts.os_family in ['RedHat'] and (ansible_facts.distribution in ['Fedora', 'Rocky', 'AlmaLinux'] or ansible_facts.distribution_major_version|int >= 8) else
-         'yum' }}
+         'zypper' if ansible_facts.os_family == 'Suse' else
+         'pacman' if ansible_facts.os_family == 'Archlinux' else
+         'dnf' if ansible_facts.os_family in ['RedHat'] and (
+           ansible_facts.distribution in ['Fedora', 'Rocky', 'AlmaLinux', 'CentOS'] or 
+           ansible_facts.distribution_major_version|int >= 8 or
+           ansible_facts.distribution in ['Amazon', 'OracleLinux']
+         ) else
+         'yum' if ansible_facts.os_family in ['RedHat'] else
+         'unknown' }}
+
+- name: Fallback package manager detection using binary availability
+  block:
+    - name: Check for available package managers
+      ansible.builtin.command: "which {{ item }}"
+      register: pkg_mgr_check
+      failed_when: false
+      changed_when: false
+      loop:
+        - apt
+        - dnf
+        - yum
+        - zypper
+        - pacman
+      when: pkg_mgr == 'unknown'
+
+    - name: Set fallback package manager
+      ansible.builtin.set_fact:
+        pkg_mgr: "{{ item.item }}"
+      loop: "{{ pkg_mgr_check.results | default([]) }}"
+      when: 
+        - pkg_mgr == 'unknown'
+        - item.rc == 0
+        - item.item in ['apt', 'dnf', 'yum', 'zypper', 'pacman']
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Fail if no supported package manager found
+      ansible.builtin.fail:
+        msg: |
+          No supported package manager found on {{ inventory_hostname }}.
+          Detected OS: {{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }}
+          OS Family: {{ ansible_facts.os_family }}
+          
+          Supported package managers: apt, dnf, yum, zypper, pacman
+          
+          Please install one of the supported package managers or override the pkg_mgr variable manually:
+          ansible-playbook site.yml -e "pkg_mgr=your_package_manager"
+      when: pkg_mgr == 'unknown'
+  tags:
+    - common
+    - package-detection
+
+- name: Display detected package manager
+  ansible.builtin.debug:
+    msg: "Using package manager: {{ pkg_mgr }} on {{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }}"
+  tags:
+    - common
+    - package-detection
 
 - name: Update package cache (apt)
   ansible.builtin.apt:
     update_cache: yes
   when: pkg_mgr == 'apt'
+  tags:
+    - common
+    - packages
 
 - name: Upgrade packages (apt)
   ansible.builtin.apt:
     upgrade: dist
     autoremove: yes
   when: pkg_mgr == 'apt'
+  tags:
+    - common
+    - packages
 
 - name: Upgrade packages (dnf)
   ansible.builtin.dnf:
@@ -30,28 +92,78 @@
     state: latest
     update_only: false
   when: pkg_mgr == 'dnf'
+  tags:
+    - common
+    - packages
 
 - name: Upgrade packages (yum)
   ansible.builtin.yum:
     name: '*'
     state: latest
   when: pkg_mgr == 'yum'
+  tags:
+    - common
+    - packages
+
+- name: Upgrade packages (zypper)
+  community.general.zypper:
+    name: '*'
+    state: latest
+  when: pkg_mgr == 'zypper'
+  tags:
+    - common
+    - packages
+
+- name: Upgrade packages (pacman)
+  community.general.pacman:
+    upgrade: yes
+  when: pkg_mgr == 'pacman'
+  tags:
+    - common
+    - packages
 
 - name: Install essential packages (apt)
   ansible.builtin.apt:
     name: "{{ essential_packages }}"
     state: present
   when: pkg_mgr == 'apt'
+  tags:
+    - common
+    - packages
 
 - name: Install essential packages (dnf)
   ansible.builtin.dnf:
     name: "{{ essential_packages }}"
     state: present
   when: pkg_mgr == 'dnf'
+  tags:
+    - common
+    - packages
 
 - name: Install essential packages (yum)
   ansible.builtin.yum:
     name: "{{ essential_packages }}"
     state: present
   when: pkg_mgr == 'yum'
+  tags:
+    - common
+    - packages
+
+- name: Install essential packages (zypper)
+  community.general.zypper:
+    name: "{{ essential_packages }}"
+    state: present
+  when: pkg_mgr == 'zypper'
+  tags:
+    - common
+    - packages
+
+- name: Install essential packages (pacman)
+  community.general.pacman:
+    name: "{{ essential_packages }}"
+    state: present
+  when: pkg_mgr == 'pacman'
+  tags:
+    - common
+    - packages
 

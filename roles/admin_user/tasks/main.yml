@@ -4,6 +4,9 @@
   ansible.builtin.group:
     name: "{{ 'sudo' if ansible_facts.os_family == 'Debian' else 'wheel' }}"
     state: present
+  tags:
+    - admin
+    - user-setup
 
 - name: Create admin user
   ansible.builtin.user:
@@ -13,6 +16,34 @@
     shell: /bin/bash
     create_home: true
     state: present
+  tags:
+    - admin
+    - user-setup
+
+- name: Create backup directory
+  ansible.builtin.file:
+    path: /var/backups/ansible
+    state: directory
+    mode: '0750'
+    owner: root
+    group: root
+  tags:
+    - admin
+    - backup
+
+- name: Backup existing sudoers file if it exists
+  ansible.builtin.copy:
+    src: "/etc/sudoers.d/{{ admin_username }}"
+    dest: "/var/backups/ansible/sudoers.d_{{ admin_username }}.{{ ansible_date_time.epoch }}.backup"
+    remote_src: yes
+    mode: '0640'
+    owner: root
+    group: root
+  when: ansible_check_mode == false
+  failed_when: false
+  tags:
+    - admin
+    - backup
 
 - name: Allow passwordless sudo for admin (safe, idempotent)
   ansible.builtin.copy:
@@ -22,6 +53,19 @@
     owner: root
     group: root
     validate: 'visudo -cf %s'
+  tags:
+    - admin
+    - sudo-config
+
+- name: Clean up old backup files (keep last 5)
+  ansible.builtin.shell: |
+    cd /var/backups/ansible
+    ls -t sudoers.d_{{ admin_username }}.*.backup 2>/dev/null | tail -n +6 | xargs -r rm -f
+  changed_when: false
+  failed_when: false
+  tags:
+    - admin
+    - backup
 
 - name: Read local SSH public key
   ansible.builtin.slurp:
@@ -29,12 +73,49 @@
   delegate_to: localhost
   run_once: true
   register: slurped_pubkey
+  tags:
+    - admin
+    - ssh-setup
 
 - name: Authorize SSH key for admin user
   ansible.builtin.authorized_key:
     user: "{{ admin_username }}"
     key: "{{ slurped_pubkey.content | b64decode }}"
     state: present
+  tags:
+    - admin
+    - ssh-setup
+
+- name: Validate admin user exists and has correct shell
+  ansible.builtin.user:
+    name: "{{ admin_username }}"
+    shell: /bin/bash
+    state: present
+  check_mode: yes
+  register: user_validation
+  tags:
+    - admin
+    - validation
+
+- name: Validate admin user sudo permissions
+  ansible.builtin.command: "sudo -l -U {{ admin_username }}"
+  register: sudo_validation
+  changed_when: false
+  failed_when: "'(ALL) NOPASSWD: ALL' not in sudo_validation.stdout"
+  tags:
+    - admin
+    - validation
+
+- name: Validate SSH key is authorized
+  ansible.builtin.authorized_key:
+    user: "{{ admin_username }}"
+    key: "{{ slurped_pubkey.content | b64decode }}"
+    state: present
+  check_mode: yes
+  register: ssh_key_validation
+  tags:
+    - admin
+    - validation
 
 # Intentionally leave root enabled (no task needed)
 

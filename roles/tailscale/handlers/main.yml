@@ -1,0 +1,13 @@
+---
+# Tailscale role handlers
+- name: restart tailscaled
+  ansible.builtin.service:
+    name: tailscaled
+    state: restarted
+  listen: "restart tailscale service"
+
+- name: reload tailscaled
+  ansible.builtin.service:
+    name: tailscaled
+    state: reloaded
+  listen: "reload tailscale service"
