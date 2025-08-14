@@ -5,9 +5,15 @@ essential_packages:
   - python3
   - vim
   - git
+  - htop
+  - tree
 
 admin_username: ansible
 local_ssh_public_key_path: "~/.ssh/id_rsa.pub"
+
+# System configuration
+timezone: "UTC"
+enable_swap: false
 
 # Docker flags
 install_docker: false
@@ -15,6 +21,7 @@ install_docker_compose: true
 docker_verify_installation: true
 docker_run_hello_world_test: true
 docker_compose_test: true
+configure_docker_daemon: true
 
 # Tailscale flags
 install_tailscale: false

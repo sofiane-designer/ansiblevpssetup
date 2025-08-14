@@ -78,6 +78,22 @@
         groups: docker
         append: true
 
+    - name: Configure Docker daemon with logging options
+      ansible.builtin.copy:
+        content: |
+          {
+            "log-driver": "json-file",
+            "log-opts": {
+              "max-size": "10m",
+              "max-file": "3"
+            },
+            "storage-driver": "overlay2"
+          }
+        dest: /etc/docker/daemon.json
+        mode: '0644'
+      notify: "restart docker service"
+      when: configure_docker_daemon | default(true)
+
 # Install Docker Compose v2 (CLI plugin) when requested
 - name: Install Docker Compose v2 (CLI plugin) on Linux
   when: install_docker_compose | default(true) | bool
