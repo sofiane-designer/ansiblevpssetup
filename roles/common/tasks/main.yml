@@ -69,6 +69,31 @@
     - common
     - package-detection
 
+- name: Set system timezone
+  community.general.timezone:
+    name: "{{ timezone | default('UTC') }}"
+  when: timezone is defined
+  tags:
+    - common
+    - timezone
+
+- name: Disable swap if requested
+  block:
+    - name: Turn off swap
+      ansible.builtin.command: swapoff -a
+      changed_when: false
+      failed_when: false
+
+    - name: Remove swap entries from fstab
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        regexp: '.*swap.*'
+        state: absent
+  when: enable_swap is defined and not enable_swap
+  tags:
+    - common
+    - swap
+
 - name: Update package cache (apt)
   ansible.builtin.apt:
     update_cache: yes
